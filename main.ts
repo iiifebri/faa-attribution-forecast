@@ -1,26 +1,13 @@
-// polymarket-faa-attribution-02's house baseline (Node 22, standard library only): persistence. It forecasts
-// that each market's Yes price stays where it was at the checkpoint, with a spread that widens like a random walk's:
+// Entry for polymarket-faa-attribution-02 (Node 22, standard library only): level-scaled persistence.
 //
-//   q_tau(h) = clamp(x + z_tau * 0.0025 * sqrt(h), 0, 1), rounded to 6 decimals
+//   q_tau(h) = clamp(x + z_tau * 0.005 * scale(x) * sqrt(h), 0, 1), rounded to 6 decimals
+//   scale(x) = 0.3 + 2 * min(x, 1 - x)
 //
-// for the minute h = 1..horizon_minutes after the checkpoint, where x is the market's last price in the case (the price
-// at `at`), 0.0025 is the spread in price units per square-root minute, and z_tau is the standard normal's quantile at
-// each level tau (0.05, 0.25, 0.5, 0.75, 0.95). Its numbers are fixed in advance, never tuned on any data. A prize needs
-// a loss strictly below the best house entry's: this one's, or the house model one-shot's.
-//
-// The kit's starter/main.ts is this program byte for byte: start your entry from it. What an entry must do:
-//   - read every <id>.in in the input directory (the grader runs one case at a time, with only that case's file there),
-//     canonical JSON {"schema":"makefun/polymarket-case/v1","case","at","horizon_minutes","quantiles","event",
-//     "markets":[{"id","name","slug","yes_token","start","prices"}]}, where `prices` holds one Yes price per minute
-//     from `start` to `at` inclusive, so the last one is the price at the checkpoint;
-//   - write <id>.out to the output directory: {"forecasts":[{"id","q"}]}, every market of the case exactly once (no
-//     other id, no other key), `q` exactly horizon_minutes rows, row h-1 the forecast for minute at+h, each row one
-//     finite number in [0,1] per quantile level, non-decreasing; at most 1 MiB. Anything else is an invalid case,
-//     scored as if every quantile were 0.5, and an entry with an invalid case takes no prize.
-// It runs offline, with no network, under the case's time cap: everything it knows is in the case's prices.
-//
-// Outside the grader's container, MAKEFUN_INPUT_DIR and MAKEFUN_OUTPUT_DIR stand in for /input and /output:
-//   mkdir -p out && MAKEFUN_INPUT_DIR=input MAKEFUN_OUTPUT_DIR=out node main.ts
+// for the minute h = 1..horizon_minutes after the checkpoint, x the last price in the case. The median stays at the
+// last price (persistence); the spread widens like a random walk but is narrower for prices near 0 or 1. Sigma 0.005
+// and the scale were checked on three separate windows of the dev series against the 0.0025 persistence baseline.
+// Starts from the kit's starter/main.ts. Reads every <id>.in from the input dir, writes <id>.out to the output dir.
+// Outside the grader: MAKEFUN_INPUT_DIR and MAKEFUN_OUTPUT_DIR stand in for /input and /output.
 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
